@@ -8,7 +8,6 @@
      Rectangle source;
      Vector2 pos;
      Texture2D texture;
-     Rectangle rec;
      Vector2 speed;
      bool active;
      Color color;
@@ -44,6 +43,10 @@ static Shot shots[NUM_SHOTS] = { 0 };
 Texture2D baseEnemyTexture;
 Texture2D spaceShipTexture;
 
+Sound fxShot;
+Sound fxBoom;
+Sound fxLevelUp;
+
 //------------------------------------------------------------------------------------
 // Module Functions Declaration (local)
 //------------------------------------------------------------------------------------
@@ -67,7 +70,15 @@ int main(void){
     
     baseEnemyTexture = LoadTexture("src/enemy.png");
     //TO-DO Understand why spaceship.png can't be loaded 
-    spaceShipTexture = LoadTexture("src/enemy.png");
+    spaceShipTexture = LoadTexture("src/spaceship.png");
+    
+    InitAudioDevice();
+    
+    fxShot = LoadSound("src/pew.wav");
+    fxBoom = LoadSound("src/boom.wav");
+    fxLevelUp = LoadSound("src/coin.wav");
+    
+    
     
     SetTargetFPS(60);
 
@@ -92,7 +103,7 @@ int main(void){
  }
  
  void InitGame(void){
-     
+     int i;
      //Initialize game variables
      gameOver = false;
      pause = false;
@@ -128,6 +139,10 @@ int main(void){
      //Initialize enemies
      InitEnemies();
      
+     //Initiliaze bullets array
+     for(i=0;i<NUM_SHOTS;i++) {
+         shots[i].active = false;
+     }
  }
  
  void InitEnemies(){
@@ -177,7 +192,10 @@ int main(void){
              UpdateBullets();
              
              //Check if there are still enemies, otherwise a new wave starts 
-             if(activeEnemies == 0) InitEnemies();
+             if(activeEnemies == 0) {
+                 InitEnemies();
+                 PauseSound(fxLevelUp);
+             }
              
              //Handle inputs
              if (IsKeyDown(KEY_LEFT) && player.pos.x > 15) player.pos.x -= player.speed.x;
@@ -224,21 +242,23 @@ int main(void){
      for(i=0;i<NUM_SHOTS;i++){
          
          //Don't render a bullet wich is outside the screen
-         if(shots[i].rec.y < -30) shots[i].active = false;
+         if(shots[i].source.y < -30) shots[i].active = false;
          
          
-         if(shots[i].active) shots[i].rec.y += shots[i].speed.y;
+         if(shots[i].active) shots[i].source.y += shots[i].speed.y;
          
          //Check if a bullet hits an enemy
          for(j=0;j<NUM_ENEMIES;j++){
             
-            if(CheckCollisionRecs((Rectangle){enemies[j].pos.x,enemies[j].pos.y,30,30},shots[i].rec) && enemies[j].active && shots[i].active){
+            if(CheckCollisionRecs((Rectangle){enemies[j].pos.x,enemies[j].pos.y,30,30},shots[i].source) && enemies[j].active && shots[i].active){
                 enemies[j].active = false;
                 activeEnemies--;
                 
                 shots[i].active = false;
                 
                 points += 100;
+                
+                PlaySound(fxBoom);
             }
              
          }
@@ -249,10 +269,10 @@ int main(void){
      
      //Initialize a bullet 
      
-     shots[activeShots].rec.x = player.pos.x + player.source.width/2-5;
-     shots[activeShots].rec.y = player.pos.y;
-     shots[activeShots].rec.width = 10;
-     shots[activeShots].rec.height = 10;
+     shots[activeShots].source.x = player.pos.x + player.source.width/2-5;
+     shots[activeShots].source.y = player.pos.y;
+     shots[activeShots].source.width = 10;
+     shots[activeShots].source.height = 10;
                  
      shots[activeShots].speed.x = 0;
      shots[activeShots].speed.y = -10;
@@ -263,7 +283,7 @@ int main(void){
                  
      activeShots++;
      
-     //PlaySound(shotFx);
+     PlaySound(fxShot);
 }
 
 void DrawGame(void){
@@ -274,7 +294,7 @@ void DrawGame(void){
     
     if(!pause && !gameOver){
         //DrawPlayer
-        DrawTextureRec(player.texture, player.source, player.pos, GREEN);
+        DrawTextureRec(player.texture, player.source, player.pos, WHITE);
         
         //Draw enemies
         for(i=0;i<NUM_ENEMIES;i++){
@@ -285,19 +305,19 @@ void DrawGame(void){
         
         //Draw bullets
         for(i=0;i<NUM_SHOTS;i++){
-            if(shots[i].active) DrawRectangleRec(shots[i].rec, shots[i].color);
+            if(shots[i].active) DrawRectangleRec(shots[i].source, shots[i].color);
         }
         
         //Display game info
         DrawText(FormatText("points: %d \n wave: %d", points, wave), 0, 0, 50, GRAY);
     }
     
-    if(pause) DrawText("game pause - press p to resume", 300, screenHeight/2, 30, GRAY);
+    if(pause) DrawText("\tgame pause - press p to resume", 300, screenHeight/2, 30, GRAY);
     
     if(gameOver){
-        DrawText("GAME OVER", screenWidth/2 - MeasureText("GAME OVER", 50), screenHeight/2, 50, RED);
-        DrawText(FormatText("\tScore - %d", points), screenWidth/2 - MeasureText("Score - 0", 30), screenHeight/2+80, 30, GRAY);
-        DrawText("Press enter to restart", screenWidth/2 - MeasureText("Press enter to restart", 30), screenHeight/2+160, 30, GRAY);
+        DrawText("\tGAME OVER", screenWidth/2 - MeasureText("GAME OVER", 50), screenHeight/6, 50, RED);
+        DrawText(FormatText("\t Score - %d", points), screenWidth/2 - MeasureText("GAME OVER", 50), screenHeight/5+30, 30, GRAY);
+        DrawText("\t Press enter to restart", screenWidth/2 - MeasureText("GAME OVER", 50), screenHeight/4+30, 30, GRAY);
     } 
     
     EndDrawing();
@@ -307,6 +327,10 @@ void DrawGame(void){
 void UnloadGame(void){
     UnloadTexture(baseEnemyTexture);
     UnloadTexture(spaceShipTexture);
+    UnloadSound(fxShot);
+    UnloadSound(fxBoom);
+    UnloadSound(fxLevelUp);
+    CloseAudioDevice();
 }
 
  
